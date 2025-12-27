@@ -27,11 +27,12 @@ def train_mace_model(run_id, dataset, params):
     command = ['mace_run_train', '--results_dir', run_directory, 
             '--checkpoints_dir', run_directory, 
             '--name', run_id+'_'+dataset,
-            '--seed', '2024', '--train_file', dataset+'/'+dataset+'_train.xyz', '--test_file', dataset+'/'+dataset+'_test.xyz', '--valid_fraction','0.05',
+            '--seed', '2024', '--train_file', 'molecular_data-main/'+dataset+'/'+dataset+'_train.xyz', '--test_file', 'molecular_data-main/'+dataset+'/'+dataset+'_test.xyz', '--valid_fraction','0.05',
             '--config_type_weights', '{Default: 1.0}', '--num_interactions', str(params['num_interactions']), '--num_channels', '128',
             '--max_L', str(params['max_L']), '--correlation', '3', '--E0s', 'average', '--model', 'MACE', 
             '--hidden_irreps', params['hidden_irreps'], '--r_max', str(params[('r_max')]), '--batch_size','16', '--ema',
-            '--ema_decay', '0.99', '--amsgrad', '--max_num_epochs', '50', '--device', 'cuda', '--error_table', 'PerAtomRMSE'
+            '--ema_decay', '0.99', '--amsgrad', '--max_num_epochs', '50', '--device', 'cpu', '--error_table', 'PerAtomRMSE',
+            '--energy_key', 'energy', '--forces_key', 'forces'
           ]
 
     # Start the training
@@ -52,8 +53,8 @@ def train_mace_model(run_id, dataset, params):
 # after running md simulation RMFS and molecular size are calculated to be saved in a json file
 # do not run more than 10000 steps on this machine
 def run_md(run_id, dataset, steps=10000, temp=310):
-    calculator = MACECalculator(model_paths='./'+run_id+'_'+dataset+'.model', device='cuda')
-    init_conf = read(dataset+'/'+dataset+'_i.xyz')
+    calculator = MACECalculator(model_paths='./'+run_id+'_'+dataset+'.model', device='cpu')
+    init_conf = read('molecular_data-main/'+dataset+'/'+dataset+'_i.xyz')
     init_conf.set_calculator(calculator)
     
     print ("run optinization")
@@ -139,7 +140,7 @@ def calculate_distances(coords):
 def mol_size(dat):
     # mean and variance in interatomic distances for the molecule
     # as proxy to describe molecular size
-    xyz_file = dat+'/'+dat+"_i.xyz"
+    xyz_file = 'molecular_data-main/'+dat+"/"+dat+"_i.xyz"
 
     # Load the molecule using ASE's read function
     atoms = read(xyz_file)

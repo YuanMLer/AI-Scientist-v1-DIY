@@ -8,18 +8,62 @@ import shutil
 import sys
 import time
 import torch
+
+import tiktoken
+
+original_encoding_for_model = tiktoken.encoding_for_model
+
+
+def patched_encoding_for_model(model_name):
+    try:
+        return original_encoding_for_model(model_name)
+    except Exception:
+        return None
+
+
+tiktoken.encoding_for_model = patched_encoding_for_model
+
 from aider.coders import Coder
 from aider.io import InputOutput
 from aider.models import Model
+from aider.models.openai import OpenAIModel
 from datetime import datetime
 
 from ai_scientist.generate_ideas import generate_ideas, check_idea_novelty
-from ai_scientist.llm import create_client, AVAILABLE_LLMS
+from ai_scientist.llm import create_client, AVAILABLE_LLMS, OLLAMA_MODELS
 from ai_scientist.perform_experiments import perform_experiments
 from ai_scientist.perform_review import perform_review, load_paper, perform_improvement
 from ai_scientist.perform_writeup import perform_writeup, generate_latex
 
 NUM_REFLECTIONS = 3
+
+
+class OllamaModel(OpenAIModel):
+    def __init__(self, name, base_url=None):
+        self.name = name
+        self.max_context_tokens = 4096
+        self.tokenizer = None
+        self.edit_format = "diff"
+        self.use_repo_map = True
+        self.send_undo_reply = True
+        self.prompt_price = 0.0
+        self.completion_price = 0.0
+        if base_url:
+            openai.api_base = base_url
+
+
+def get_aider_model(model):
+    if model in OLLAMA_MODELS:
+        ollama_base_url = os.environ.get("OLLAMA_BASE_URL", "http://1.13.248.121:17719")
+        return OllamaModel(model, base_url=f"{ollama_base_url}/v1")
+    elif model == "deepseek-coder-v2-0724":
+        return Model("deepseek/deepseek-coder")
+    elif model == "deepseek-reasoner":
+        return Model("deepseek/deepseek-reasoner")
+    elif model == "llama3.1-405b":
+        return Model("openrouter/meta-llama/llama-3.1-405b-instruct")
+    else:
+        return Model(model)
 
 
 def print_time():
@@ -48,7 +92,7 @@ def parse_arguments():
     parser.add_argument(
         "--model",
         type=str,
-        default="claude-3-5-sonnet-20240620",
+        default="qwen3-next:latest",
         choices=AVAILABLE_LLMS,
         help="Model to use for AI Scientist.",
     )
@@ -198,14 +242,7 @@ def do_idea(
         io = InputOutput(
             yes=True, chat_history_file=f"{folder_name}/{idea_name}_aider.txt"
         )
-        if model == "deepseek-coder-v2-0724":
-            main_model = Model("deepseek/deepseek-coder")
-        elif model == "deepseek-reasoner":
-            main_model = Model("deepseek/deepseek-reasoner")
-        elif model == "llama3.1-405b":
-            main_model = Model("openrouter/meta-llama/llama-3.1-405b-instruct")
-        else:
-            main_model = Model(model)
+        main_model = get_aider_model(model)
         coder = Coder.create(
             main_model=main_model,
             fnames=fnames,
@@ -234,14 +271,7 @@ def do_idea(
         if writeup == "latex":
             writeup_file = osp.join(folder_name, "latex", "template.tex")
             fnames = [exp_file, writeup_file, notes]
-            if model == "deepseek-coder-v2-0724":
-                main_model = Model("deepseek/deepseek-coder")
-            elif model == "deepseek-reasoner":
-                main_model = Model("deepseek/deepseek-reasoner")
-            elif model == "llama3.1-405b":
-                main_model = Model("openrouter/meta-llama/llama-3.1-405b-instruct")
-            else:
-                main_model = Model(model)
+            main_model = get_aider_model(model)
             coder = Coder.create(
                 main_model=main_model,
                 fnames=fnames,

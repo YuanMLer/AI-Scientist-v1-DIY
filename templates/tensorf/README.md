@@ -23,3 +23,6 @@ datasets/
 
 - Code is largely sourced from official github repository (https://github.com/apchenstu/TensoRF) of TensoRF.
 
+
+wget https://www.kaggle.com/datasets/nguyenhung1903/nerf-synthetic-dataset/data
+

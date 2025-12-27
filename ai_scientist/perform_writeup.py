@@ -7,8 +7,40 @@ import shutil
 import subprocess
 from typing import Optional, Tuple
 
+import openai
+from aider.models.openai import OpenAIModel
+
 from ai_scientist.generate_ideas import search_for_papers
-from ai_scientist.llm import get_response_from_llm, extract_json_between_markers, create_client, AVAILABLE_LLMS
+from ai_scientist.llm import get_response_from_llm, extract_json_between_markers, create_client, AVAILABLE_LLMS, OLLAMA_MODELS
+
+
+class OllamaModel(OpenAIModel):
+    def __init__(self, name, base_url=None):
+        self.name = name
+        self.max_context_tokens = 4096
+        self.tokenizer = None
+        self.edit_format = "diff"
+        self.use_repo_map = True
+        self.send_undo_reply = True
+        self.prompt_price = 0.0
+        self.completion_price = 0.0
+        if base_url:
+            openai.api_base = base_url
+
+
+def get_aider_model(model):
+    if model in OLLAMA_MODELS:
+        ollama_base_url = os.environ.get("OLLAMA_BASE_URL", "http://1.13.248.121:17719")
+        return OllamaModel(model, base_url=f"{ollama_base_url}/v1")
+    elif model == "deepseek-coder-v2-0724":
+        from aider.models import Model
+        return Model("deepseek/deepseek-coder")
+    elif model == "llama3.1-405b":
+        from aider.models import Model
+        return Model("openrouter/meta-llama/llama-3.1-405b-instruct")
+    else:
+        from aider.models import Model
+        return Model(model)
 
 
 # GENERATE LATEX
@@ -524,7 +556,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        default="gpt-4o-2024-05-13",
+        default="qwen3-next:latest",
         choices=AVAILABLE_LLMS,
         help="Model to use for AI Scientist.",
     )
@@ -556,12 +588,7 @@ if __name__ == "__main__":
         raise ValueError(f"Idea {idea_name} not found")
     fnames = [exp_file, writeup_file, notes]
     io = InputOutput(yes=True, chat_history_file=f"{folder_name}/{idea_name}_aider.txt")
-    if args.model == "deepseek-coder-v2-0724":
-        main_model = Model("deepseek/deepseek-coder")
-    elif args.model == "llama3.1-405b":
-        main_model = Model("openrouter/meta-llama/llama-3.1-405b-instruct")
-    else:
-        main_model = Model(model)
+    main_model = get_aider_model(model)
     coder = Coder.create(
         main_model=main_model,
         fnames=fnames,

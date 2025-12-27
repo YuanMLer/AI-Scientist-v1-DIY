@@ -326,7 +326,7 @@ if __name__ == '__main__':
         render_test(args)
     else:
         for name in ["chair", "drums"]:
-            args.datadir = f"./datasets/nerf_synthetic/{name}"
+            args.datadir = f"./datasets/nerf/data/nerf_synthetic/lego"
             args.expname = f"tensorf_{name}_VM"
             info_list = []
             for seed in range(args.exp_seeds):
